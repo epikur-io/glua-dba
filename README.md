@@ -1,4 +1,4 @@
-# Simple database acces for gopher-lua
+# Simple database access for gopher-lua
 
 ## Example
 
