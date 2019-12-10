@@ -12,7 +12,7 @@
 		customerNumber = "100",
 		limit = "50",
 	})
-	local result = query_1:run()
+	local result = myQuery:run()
 	
 	db:close()
 
