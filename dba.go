@@ -3,6 +3,7 @@ package dba
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	_ "github.com/denisenkom/go-mssqldb"
 	_ "github.com/go-sql-driver/mysql"
@@ -55,10 +56,9 @@ func Loader(L *lua.LState) int {
 	t.RawSetH(lua.LString("version"), lua.LString(dbaVersion))
 	L.SetFuncs(t, api)
 	L.Push(t)
-	
+
 	return 1
 }
-
 
 // Registers my person type to given L.
 func RegisterDBA(L *lua.LState) {
@@ -220,7 +220,7 @@ func dba_TableNames(L *lua.LState) int {
 		return 2
 	}
 	for _, t := range tbls {
-		lTbl.Append(lua.LString(t))
+		lTbl.Append(lua.LString(strings.Join(t[:], ".")))
 	}
 	L.Push(lTbl)
 	L.Push(lua.LNil)
@@ -237,7 +237,7 @@ func dba_ViewNames(L *lua.LState) int {
 		return 2
 	}
 	for _, t := range tbls {
-		lTbl.Append(lua.LString(t))
+		lTbl.Append(lua.LString(strings.Join(t[:], ".")))
 	}
 	L.Push(lTbl)
 	L.Push(lua.LNil)
@@ -246,15 +246,25 @@ func dba_ViewNames(L *lua.LState) int {
 
 func dba_TableMeta(L *lua.LState) int {
 	dba := checkDBA(L)
-	tname := L.CheckString(2)
-	tbls, err := schema.Table(dba.DBX.DB(), tname)
+	tschema := L.CheckString(2)
+	tname := L.CheckString(3)
+	key := [2]string{tschema, tname}
+	tbls, err := schema.Tables(dba.DBX.DB())
+	res, ok := tbls[key]
 	lTbl := L.NewTable()
+	if !ok {
+		if err != nil {
+			L.Push(lTbl)
+			L.Push(lua.LString("table or schema not found"))
+			return 2
+		}
+	}
 	if err != nil {
 		L.Push(lTbl)
 		L.Push(lua.LString(err.Error()))
 		return 2
 	}
-	for _, t := range tbls {
+	for _, t := range res {
 		tx := L.NewTable()
 		tx.RawSetString("name", lua.LString(t.Name()))
 		tx.RawSetString("db_type", lua.LString(t.DatabaseTypeName()))
@@ -283,15 +293,23 @@ func dba_TableMeta(L *lua.LState) int {
 
 func dba_ViewMeta(L *lua.LState) int {
 	dba := checkDBA(L)
-	tname := L.CheckString(2)
-	tbls, err := schema.View(dba.DBX.DB(), tname)
+	tschema := L.CheckString(2)
+	tname := L.CheckString(3)
+	views, err := schema.Views(dba.DBX.DB())
+	key := [2]string{tschema, tname}
 	lTbl := L.NewTable()
+	res, ok := views[key]
+	if !ok {
+		L.Push(lTbl)
+		L.Push(lua.LString("view or schema not found"))
+		return 2
+	}
 	if err != nil {
 		L.Push(lTbl)
 		L.Push(lua.LString(err.Error()))
 		return 2
 	}
-	for _, t := range tbls {
+	for _, t := range res {
 		tx := L.NewTable()
 		tx.RawSetString("name", lua.LString(t.Name()))
 		tx.RawSetString("db_type", lua.LString(t.DatabaseTypeName()))
